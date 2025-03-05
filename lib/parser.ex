@@ -1,14 +1,21 @@
-defmodule Opml.Parser do
+defmodule Opml do
   @moduledoc """
-  Documentation for `Opml`.
+  Parser module for OPML (Outline Processor Markup Language) files.
+
+  This module provides functionality to parse OPML files from either URLs or direct XML content,
+  and converts the OPML structure into a more usable JSON-like map structure.
   """
 
   @doc """
-  解析 OPML 文件，支持从 URL 或直接内容解析。
+  Parses an OPML file from either a URL or direct XML content.
+  Returns a structured map representation of the OPML data.
 
-  ## 示例
+  ## Parameters
+    * `data` - A URL string pointing to an OPML file or a string containing OPML XML content
 
-      iex> Opml.Parser.parse("http://example.com/feed.opml")
+  ## Returns
+    * `{:ok, map}` - Successfully parsed OPML data as a map
+    * `{:error, reason}` - Error occurred during parsing
   """
   def parse(data) do
     case is_url(data) do
@@ -33,8 +40,8 @@ defmodule Opml.Parser do
     end
   end
 
-  def parse_content(content) do
-    # 使用正则表达式替换XML声明中的编码为UTF-8
+  defp parse_content(content) do
+    # Use regular expression to replace encoding in XML declaration with UTF-8
     content =
       Regex.replace(~r/(<\?xml[^>]*encoding=["'])([^"']+)(["'][^>]*\?>)/i, content, fn _,
                                                                                        start,
@@ -50,9 +57,9 @@ defmodule Opml.Parser do
     end
   end
 
-  # 递归移除解析结果中的空白字符节点
+  # Recursively remove whitespace nodes from the parsed result
   defp remove_whitespace(parsed) when is_binary(parsed) do
-    # 只有当字符串全部由空白字符组成时才移除
+    # Only remove if the string is entirely whitespace
     if String.match?(parsed, ~r/\A[\s\r\n\t]*\z/) do
       {:ok, nil}
     else
@@ -61,7 +68,7 @@ defmodule Opml.Parser do
   end
 
   defp remove_whitespace({tag, attrs, children}) do
-    # 递归处理子节点并过滤掉 nil 值
+    # Recursively process child nodes and filter out nil values
     filtered_children =
       children
       |> Enum.map(&remove_whitespace/1)
@@ -75,7 +82,7 @@ defmodule Opml.Parser do
     {:ok, {tag, attrs, filtered_children}}
   end
 
-  # 处理其他类型的数据（如列表）
+  # Process other types of data (e.g. lists)
   defp remove_whitespace(list) when is_list(list) do
     processed =
       list
@@ -90,29 +97,29 @@ defmodule Opml.Parser do
     {:ok, processed}
   end
 
-  # 处理其他类型的数据
+  # Process other types of data
   defp remove_whitespace(other), do: {:ok, other}
 
-  # 将 OPML 结构转换为 JSON 结构
+  # Convert OPML structure to JSON structure
   defp to_json_structure({"opml", attrs, children}) do
-    # 提取版本信息
+    # Extract version information
     version =
       attrs
       |> Enum.find(fn {key, _} -> key == "version" end)
       |> case do
-        # 默认版本
+        # Default version
         nil -> "1.0"
         pair -> elem(pair, 1)
       end
 
-    # 初始化结果结构
+    # Initialize result structure
     result = %{
       "version" => version,
       "head" => %{},
       "body" => %{}
     }
 
-    # 处理子节点
+    # Process child nodes
     result =
       Enum.reduce(children, result, fn
         {"head", _, head_children}, acc ->
@@ -130,7 +137,7 @@ defmodule Opml.Parser do
     {:ok, result}
   end
 
-  # 处理 head 节点下的子节点
+  # Process child nodes of the head element
   defp process_head_children(children) do
     Enum.reduce(children, %{}, fn
       {tag, _, [value]}, acc when is_binary(value) ->
@@ -144,17 +151,17 @@ defmodule Opml.Parser do
     end)
   end
 
-  # 处理 body 节点下的子节点（outline 元素）
+  # Process child nodes of the body element (outline elements)
   defp process_body_children(children) do
     Enum.map(children, fn
       {"outline", attrs, outline_children} ->
-        # 将属性转换为 map
+        # Convert attributes to map
         attrs_map =
           Enum.reduce(attrs, %{}, fn {key, value}, acc ->
             Map.put(acc, key, value)
           end)
 
-        # 如果有子 outline，递归处理
+        # If there are child outlines, recursively process them
         if Enum.empty?(outline_children) do
           attrs_map
         else
@@ -167,7 +174,7 @@ defmodule Opml.Parser do
     |> Enum.filter(&(&1 != nil))
   end
 
-  def fetch_content(url) do
+  defp fetch_content(url) do
     req =
       Req.new(max_redirects: 5)
 

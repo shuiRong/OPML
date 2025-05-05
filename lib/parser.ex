@@ -1,4 +1,6 @@
 defmodule Opml do
+  alias Opml.Builder
+
   @moduledoc """
   Parser module for OPML (Outline Processor Markup Language) files.
 
@@ -28,6 +30,20 @@ defmodule Opml do
       false ->
         parse_content(data)
     end
+  end
+
+  @doc """
+  构建OPML XML字符串。
+
+  ## 参数
+    * `outlines` - 大纲元素列表
+    * `options` - 可选配置项
+
+  ## 返回
+    * 符合OPML 2.0规范的XML字符串
+  """
+  def build(outlines, options \\ []) do
+    Builder.build(outlines, options)
   end
 
   defp is_url(url) do
